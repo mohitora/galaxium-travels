@@ -17,11 +17,21 @@ export const UserIdentification = ({ isOpen, onClose, onSuccess }: UserIdentific
   const [isLoading, setIsLoading] = useState(false);
   const [isNewUser, setIsNewUser] = useState(false);
 
+  const isValidEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!name.trim() || !email.trim()) {
       toast.error('Please fill in all fields');
+      return;
+    }
+
+    if (!isValidEmail(email.trim())) {
+      toast.error('Please enter a valid email address');
       return;
     }
 
