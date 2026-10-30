@@ -40,11 +40,21 @@ export const Flights = () => {
     );
     setFilteredFlights(filtered);
   }, [searchTerm, flights]);
+  const fetchWithRetry = async (fn: () => Promise<any>, retries = 3, delay = 1000): Promise<any> => {
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      try {
+        return await fn();
+      } catch (error) {
+        if (attempt === retries) throw error;
+        await new Promise((resolve) => setTimeout(resolve, delay * attempt));
+      }
+    }
+  };
 
   const loadFlights = async () => {
     setIsLoading(true);
     try {
-      const data = await getFlights();
+      const data = await fetchWithRetry(getFlights);
       setFlights(data);
       setFilteredFlights(data);
     } catch (error: any) {
@@ -170,5 +180,3 @@ export const Flights = () => {
     </div>
   );
 };
-
-// Made with Bob
