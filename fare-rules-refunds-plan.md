@@ -304,7 +304,19 @@ Both services use one shared refund calculation + the rule table in schemas.py
 - [`booking_system_frontend/src/utils/formatters.ts`](booking_system_frontend/src/utils/formatters.ts) — `formatCurrency`
 - Use `Modal` from the common barrel export and existing Tailwind tokens
 
-**Status**: [ ] pending
+**Handoff notes (for Sub-Task 8 onwards)**
+- Only [`src/pages/MyBookings.tsx`](booking_system_frontend/src/pages/MyBookings.tsx) changed. `BookingCard.tsx`, `FlightCard.tsx`, backend and tests untouched.
+- `handleCancelClick(bookingId)` is now async: opens the modal, sets `isPreviewLoading`, calls `getRefundPreview`, then sets `refundPreview` or `previewFailed`. Stale responses are dropped with a `previewRequestId` ref counter, bumped on every open and on `handleCloseCancelModal`. `BookingCard`'s `onCancel` prop type is unchanged (the returned promise is ignored).
+- New `handleCloseCancelModal()` resets modal/preview state; used by the Modal `onClose`, the "Keep Booking" button and `handleConfirmCancel`.
+- Modal shows, below the existing warning text: `LoadingSpinner size="sm"` while loading; "You'll get {formatCurrency(refund_amount)} back" when `refund_amount > 0`; otherwise "No refund applies if you cancel now"; plus `SEAT_CLASS_REFUND_POLICY[seat_class]` under either. On failure: toast with `details || error` (or "Failed to load refund preview" on a thrown error) and an inline "Could not load the refund amount. You can still cancel." Confirm/keep buttons are never disabled by the preview.
+- `refund_amount` flow: `cancelBooking` returns a `Booking` with `refund_amount`; the page then calls `loadData()`, which refetches `getUserBookings`, so the cancelled booking in `bookings` state carries `refund_amount` (number; `null` when not cancelled). The success toast uses the cancel response's `refund_amount` ("Booking cancelled. $X refunded." or "Booking cancelled. No refund applied.").
+- For Sub-Task 8: `BookingCard` already receives the full `Booking` as `booking`, so `booking.refund_amount` is available with no prop changes. Cancelled bookings land in `pastBookings` and render via the same `BookingCard`. Use `status === 'cancelled' && booking.refund_amount != null` as the display condition. Amounts are integers formatted with `formatCurrency`.
+- Validation: `npm run build` passes. `npm run lint` unchanged at 13 problems (11 errors, 2 warnings), all pre-existing; the `any` errors and `exhaustive-deps` warning in `MyBookings.tsx` moved from lines 41/70/28 to 53/120/40. No new problems.
+- End to end with curl (server started, then stopped): booked an Economy booking on flight 1 (price 1000000, departure 2099) via `POST /book`; `GET /refund-preview/{id}` returned `refund_amount 800000, refund_percent 80`; `POST /cancel/{id}` returned `status cancelled, refund_amount 800000`; a second preview returned `ALREADY_CANCELLED`; `GET /bookings/1` showed `refund_amount 800000`. The seed has no booked Economy booking (booked ones are flexi/business/galaxium), so one was created.
+- NOT verified: the modal was not rendered in a browser, so layout, animation and the loading/error visuals were not visually checked. The zero-refund branch was not exercised in the UI (seed flights are in 2099).
+- `booking_system_backend/booking.db` is tracked in git; deleting it after the check shows as ` D` in `git status`.
+
+**Status**: [x] done
 
 ---
 
