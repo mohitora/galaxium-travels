@@ -1,6 +1,7 @@
 import type { Booking, Flight } from '../../types';
+import { SEAT_CLASS_LABELS, SEAT_CLASS_COLORS } from '../../types';
 import { Card, Button } from '../common';
-import { Plane, Calendar, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { Plane, Calendar, CheckCircle, XCircle, Clock, Star } from 'lucide-react';
 import { formatDate, formatCurrency } from '../../utils/formatters';
 import { motion } from 'framer-motion';
 
@@ -92,9 +93,14 @@ export const BookingCard = ({ booking, flight, onCancel, isCancelling }: Booking
             </div>
 
             <div className="flex items-center justify-between pt-3 border-t border-white/10">
-              <span className="text-sm text-star-white/60">Price</span>
+              <div className="flex items-center gap-2">
+                <Star size={14} className="text-star-white/50" />
+                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${SEAT_CLASS_COLORS[booking.seat_class]}`}>
+                  {SEAT_CLASS_LABELS[booking.seat_class]}
+                </span>
+              </div>
               <span className="text-lg font-bold text-star-white">
-                {formatCurrency(flight.price)}
+                {formatCurrency(flight[`${booking.seat_class}_price` as keyof Flight] as number)}
               </span>
             </div>
           </div>

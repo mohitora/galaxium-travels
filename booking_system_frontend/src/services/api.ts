@@ -2,6 +2,7 @@ import axios from 'axios';
 import type {
   Flight,
   Booking,
+  RefundPreview,
   User,
   BookingRequest,
   UserRegistration,
@@ -97,6 +98,18 @@ export const cancelBooking = async (
 ): Promise<Booking | ErrorResponse> => {
   const response = await api.post<Booking | ErrorResponse>(
     `/cancel/${bookingId}`
+  );
+  return response.data;
+};
+
+/**
+ * Preview the refund for cancelling a booking
+ */
+export const getRefundPreview = async (
+  bookingId: number
+): Promise<RefundPreview | ErrorResponse> => {
+  const response = await api.get<RefundPreview | ErrorResponse>(
+    `/refund-preview/${bookingId}`
   );
   return response.data;
 };

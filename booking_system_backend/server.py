@@ -7,7 +7,7 @@ from typing import Union
 from db import SessionLocal, init_db, get_db
 from seed import seed
 from services import flight, user, booking
-from schemas import FlightOut, BookingOut, UserOut, ErrorResponse, BookingRequest, UserRegistration
+from schemas import FlightOut, BookingOut, UserOut, ErrorResponse, BookingRequest, UserRegistration, RefundPreviewOut
 
 
 # ==================== MCP SERVER (for AI agents) ====================
@@ -28,14 +28,14 @@ def list_flights() -> list[FlightOut]:
 
 
 @mcp.tool()
-def book_flight(user_id: int, name: str, flight_id: int) -> BookingOut:
-    """Book a seat on a specific flight for a user.
-    Requires user_id, name, and flight_id.
-    Decrements available seats if successful.
+def book_flight(user_id: int, name: str, flight_id: int, seat_class: str) -> BookingOut:
+    """Book a seat of a specific class on a flight for a user.
+    Requires user_id, name, flight_id, and seat_class (economy, flexi, business, or galaxium).
+    Decrements available seats for the chosen class if successful.
     Returns booking details or raises an error if booking is not possible."""
     db = SessionLocal()
     try:
-        result = booking.book_flight(db, user_id, name, flight_id)
+        result = booking.book_flight(db, user_id, name, flight_id, seat_class)
         if isinstance(result, ErrorResponse):
             raise Exception(result.details or result.error)
         return result
@@ -55,10 +55,27 @@ def get_bookings(user_id: int) -> list[BookingOut]:
 
 
 @mcp.tool()
+def get_refund_preview(booking_id: int) -> RefundPreviewOut:
+    """Preview the refund for cancelling a booked booking now, without cancelling it.
+    Returns booking_id, seat_class, class_price, refund_amount, refund_percent and departure_time.
+    refund_percent is the class rule; refund_amount is 0 when no refund applies now.
+    Raises an error if the booking is not found, already cancelled, or not cancellable."""
+    db = SessionLocal()
+    try:
+        result = booking.get_refund_preview(db, booking_id)
+        if isinstance(result, ErrorResponse):
+            raise Exception(result.details or result.error)
+        return result
+    finally:
+        db.close()
+
+
+@mcp.tool()
 def cancel_booking(booking_id: int) -> BookingOut:
-    """Cancel an existing booking by its booking_id.
-    Increments available seats for the flight if successful.
-    Returns updated booking details or raises an error if already cancelled or not found."""
+    """Cancel a booked booking by its booking_id and refund it per its seat class fare rules.
+    Restores one seat to the flight and stores the refund on the booking.
+    Returns updated booking details including refund_amount (use get_refund_preview first to see it).
+    Raises an error: BOOKING_NOT_FOUND, ALREADY_CANCELLED, or BOOKING_NOT_CANCELLABLE (e.g. completed)."""
     db = SessionLocal()
     try:
         result = booking.cancel_booking(db, booking_id)
@@ -144,11 +161,11 @@ def get_flights(db: Session = Depends(get_db)):
 
 @app.post("/book", response_model=Union[BookingOut, ErrorResponse], tags=["Bookings"])
 def book_flight_endpoint(request: BookingRequest, db: Session = Depends(get_db)):
-    """Book a seat on a specific flight for a user.
+    """Book a seat of a specific class on a flight for a user.
 
-    Requires user_id, name, and flight_id. Decrements available seats if successful.
+    Requires user_id, name, flight_id, and seat_class. Decrements seats for the chosen class if successful.
     """
-    return booking.book_flight(db, request.user_id, request.name, request.flight_id)
+    return booking.book_flight(db, request.user_id, request.name, request.flight_id, request.seat_class)
 
 
 @app.get("/bookings/{user_id}", response_model=list[BookingOut], tags=["Bookings"])
@@ -159,11 +176,23 @@ def get_user_bookings(user_id: int, db: Session = Depends(get_db)):
 
 @app.post("/cancel/{booking_id}", response_model=Union[BookingOut, ErrorResponse], tags=["Bookings"])
 def cancel_booking_endpoint(booking_id: int, db: Session = Depends(get_db)):
-    """Cancel an existing booking by its booking_id.
+    """Cancel a booked booking by its booking_id and refund it per its seat class fare rules.
 
-    Increments available seats for the flight if successful.
+    Restores one seat and returns the booking with refund_amount.
+    Errors: BOOKING_NOT_FOUND, ALREADY_CANCELLED, BOOKING_NOT_CANCELLABLE.
     """
     return booking.cancel_booking(db, booking_id)
+
+
+@app.get("/refund-preview/{booking_id}", response_model=Union[RefundPreviewOut, ErrorResponse], tags=["Bookings"])
+def refund_preview_endpoint(booking_id: int, db: Session = Depends(get_db)):
+    """Preview the refund for cancelling a booked booking now, without cancelling it.
+
+    Returns booking_id, seat_class, class_price, refund_amount, refund_percent and departure_time.
+    refund_percent is the class rule; refund_amount is 0 when no refund applies now.
+    Errors: BOOKING_NOT_FOUND, ALREADY_CANCELLED, BOOKING_NOT_CANCELLABLE, FLIGHT_NOT_FOUND.
+    """
+    return booking.get_refund_preview(db, booking_id)
 
 
 @app.post("/register", response_model=Union[UserOut, ErrorResponse], tags=["Users"])

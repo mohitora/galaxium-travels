@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import type { Flight } from '../../types';
+import type { Flight, SeatClass } from '../../types';
+import { SEAT_CLASS_LABELS, SEAT_CLASS_COLORS } from '../../types';
 import { Modal, Button } from '../common';
-import { Plane, Calendar, Clock, DollarSign } from 'lucide-react';
+import { Plane, Calendar, Clock, DollarSign, Star } from 'lucide-react';
 import { formatCurrency, formatDate, calculateDuration } from '../../utils/formatters';
 import { bookFlight, isErrorResponse } from '../../services/api';
 import { useUser } from '../../hooks/useUser';
@@ -11,14 +12,19 @@ interface BookingModalProps {
   isOpen: boolean;
   onClose: () => void;
   flight: Flight | null;
+  seatClass: SeatClass | null;
   onSuccess: () => void;
 }
 
-export const BookingModal = ({ isOpen, onClose, flight, onSuccess }: BookingModalProps) => {
+export const BookingModal = ({ isOpen, onClose, flight, seatClass, onSuccess }: BookingModalProps) => {
   const { user } = useUser();
   const [isLoading, setIsLoading] = useState(false);
 
-  if (!flight) return null;
+  if (!flight || !seatClass) return null;
+
+  const classPrice = flight[`${seatClass}_price` as keyof Flight] as number;
+  const classLabel = SEAT_CLASS_LABELS[seatClass];
+  const classColorClass = SEAT_CLASS_COLORS[seatClass];
 
   const handleConfirmBooking = async () => {
     if (!user) {
@@ -33,6 +39,7 @@ export const BookingModal = ({ isOpen, onClose, flight, onSuccess }: BookingModa
         user_id: user.user_id,
         name: user.name,
         flight_id: flight.flight_id,
+        seat_class: seatClass,
       });
 
       if (isErrorResponse(result)) {
@@ -40,7 +47,7 @@ export const BookingModal = ({ isOpen, onClose, flight, onSuccess }: BookingModa
         return;
       }
 
-      toast.success('Flight booked successfully!');
+      toast.success(`${classLabel} seat booked successfully!`);
       onSuccess();
       onClose();
     } catch (error: any) {
@@ -75,9 +82,20 @@ export const BookingModal = ({ isOpen, onClose, flight, onSuccess }: BookingModa
           </div>
 
           <div className="space-y-3">
+            {/* Seat Class */}
+            <div className="flex items-start gap-3">
+              <Star className="mt-1 shrink-0" size={20} style={{ color: 'currentColor' }} />
+              <div>
+                <p className="text-xs text-star-white/60">Seat Class</p>
+                <span className={`text-sm font-bold ${classColorClass.split(' ')[0]}`}>
+                  {classLabel}
+                </span>
+              </div>
+            </div>
+
             {/* Departure */}
             <div className="flex items-start gap-3">
-              <Calendar className="text-cosmic-purple mt-1" size={20} />
+              <Calendar className="text-cosmic-purple mt-1 shrink-0" size={20} />
               <div>
                 <p className="text-xs text-star-white/60">Departure</p>
                 <p className="text-star-white font-medium">
@@ -88,7 +106,7 @@ export const BookingModal = ({ isOpen, onClose, flight, onSuccess }: BookingModa
 
             {/* Arrival */}
             <div className="flex items-start gap-3">
-              <Calendar className="text-cosmic-purple mt-1" size={20} />
+              <Calendar className="text-cosmic-purple mt-1 shrink-0" size={20} />
               <div>
                 <p className="text-xs text-star-white/60">Arrival</p>
                 <p className="text-star-white font-medium">
@@ -99,7 +117,7 @@ export const BookingModal = ({ isOpen, onClose, flight, onSuccess }: BookingModa
 
             {/* Duration */}
             <div className="flex items-start gap-3">
-              <Clock className="text-cosmic-purple mt-1" size={20} />
+              <Clock className="text-cosmic-purple mt-1 shrink-0" size={20} />
               <div>
                 <p className="text-xs text-star-white/60">Duration</p>
                 <p className="text-star-white font-medium">
@@ -121,14 +139,14 @@ export const BookingModal = ({ isOpen, onClose, flight, onSuccess }: BookingModa
           </div>
         )}
 
-        {/* Price */}
+        {/* Price — uses per-class price */}
         <div className="flex items-center justify-between p-4 glass-card bg-cosmic-gradient">
           <div className="flex items-center gap-2">
             <DollarSign className="text-white" size={24} />
             <span className="text-white font-semibold">Total Price</span>
           </div>
           <span className="text-2xl font-bold text-white">
-            {formatCurrency(flight.price)}
+            {formatCurrency(classPrice)}
           </span>
         </div>
 

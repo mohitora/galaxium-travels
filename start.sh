@@ -11,9 +11,9 @@ GREEN='\033[0;32m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# Check if Python is installed
-if ! command -v python3 &> /dev/null; then
-    echo "❌ Python 3 is not installed. Please install Python 3 first."
+# Check if uv is installed (used for Python env management)
+if ! command -v uv &> /dev/null; then
+    echo "❌ 'uv' is not installed. Please install it with: brew install uv"
     exit 1
 fi
 
@@ -37,15 +37,11 @@ trap cleanup SIGINT SIGTERM
 echo -e "${BLUE}📡 Starting Backend Server...${NC}"
 cd booking_system_backend
 
-# Check if virtual environment exists, create if not
-if [ ! -d ".venv" ]; then
-    echo "Creating Python virtual environment..."
-    python3 -m venv .venv
-fi
+# Create venv with Python 3.11+ via uv and install dependencies
+uv sync --python 3.11 --quiet 2>/dev/null || uv venv --python 3.11 .venv && uv pip install -q -r requirements.txt
 
-# Activate virtual environment and install dependencies
+# Activate virtual environment
 source .venv/bin/activate
-pip install -q -r requirements.txt
 
 # Start backend server in background
 python server.py &
